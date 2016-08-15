@@ -60,14 +60,22 @@ module.exports = function (RED) {
 
         RED.nodes.createNode(this, config);
 
+        this.clienttype = config.clienttype;
         this.host = config.host;
         this.port = config.port;
+        this.serialport = config.serialport;
         this.unit_id = config.unit_id;
 
         var node = this;
 
         node.client = null;
-        var serverInfo = ' at ' + node.host + ':' + node.port + ' unit_id: ' + node.unit_id;
+        var serverInfo;
+        if (this.clienttype == "serial") {
+            serverInfo = ' serial at ' + node.serialport;
+        } else {
+            serverInfo = ' TCP at ' + node.host + ':' + node.port;
+        }
+        serverInfo += ' unit_id: ' + node.unit_id;
         node.connections = 0;
 
         function verbose_warn(logMessage) {
@@ -99,15 +107,23 @@ module.exports = function (RED) {
                 try {
                     node.connections++;
 
-                    node.client = modbus.client.tcp.complete({
-                        'host': config.host,
-                        'port': config.port,
-                        'autoReconnect': true,
-                        'timeout': 5000,
-                        'unitId': Number(config.unit_id)
-                    });
-
-                    node.client.connect();
+                    if (node.clienttype == "serial") {
+                        node.client = modbus.client.serial.complete({
+                            'portName': config.serialport,
+                            'autoReconnect': true,
+                            'timeout': 5000,
+                            'unitId': Number(config.unit_id)
+                        });
+                    } else {
+                        node.client = modbus.client.tcp.complete({
+                            'host': config.host,
+                            'port': config.port,
+                            'autoReconnect': true,
+                            'timeout': 5000,
+                            'unitId': Number(config.unit_id)
+                        });
+                        node.client.connect();
+                    }
                     node.client.on('close', node.receiveEventClose);
 
                     handler(node.client);

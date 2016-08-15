@@ -57,26 +57,89 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
     RED.nodes.registerType('modbus-client', {
         category: 'config',
         defaults: {
+            clienttype: {value: "tcp"},
+
+            /* TCP configuration */
             host: {value: "127.0.0.1", required: true},
             port: {value: 502, required: true, validate: RED.validators.number()},
-            unit_id: {value: 1, required: true, validate: RED.validators.number()}
+            /* Serial configuration */
+            serialport: {value: "/dev/ttyS0", required: false},
+            unit_id: {value: 1, required: true, validate: RED.validators.number()},
         },
         label: function () {
-            return "modbustcp@" + this.host + ":" + this.port;
-        }
+            if (this.clienttype == "tcp") {
+                return "modbustcp@" + this.host + ":" + this.port;
+            } else if (this.clienttype == "serial") {
+                return "modbus-serial@" + this.serialport;
+            }
+        },
+        oneditprepare: function() {
+            var previous = null;
+            $("#node-config-input-clienttype").on('focus', function () { previous = this.value; }).change(function() {
+                if (previous == null) { previous = $("#node-config-input-clienttype").val(); }
+                // TODO: safe default values when switching type?
+                if ($("#node-config-input-clienttype").val() == "tcp") {
+                    $("#node-config-modbus-serial").hide();
+                    $("#node-config-modbus-tcp").show();
+                }
+                else {
+                    $("#node-config-modbus-serial").show();
+                    $("#node-config-modbus-tcp").hide();
+                }
+            });
+            try {
+                $("#node-config-input-serialport").autocomplete( "destroy" );
+            } catch(err) {
+            }
+            $("#node-config-lookup-serial").click(function() {
+                $("#node-config-lookup-serial").addClass('disabled');
+                $.getJSON('serialports',function(data) {
+                    $("#node-config-lookup-serial").removeClass('disabled');
+                    var ports = [];
+                    $.each(data, function(i, port) {
+                        ports.push(port.comName);
+                    });
+                    $("#node-config-input-serialport").autocomplete({
+                        source:ports,
+                        minLength:0,
+                        close: function( event, ui ) {
+                            $("#node-config-input-serialport").autocomplete( "destroy" );
+                        }
+                    }).autocomplete("search","");
+                });
+            });
+
+		},
+
     });
 </script>
 
-
 <script type="text/x-red" data-template-name="modbus-client">
     <div class="form-row">
-        <label for="node-config-input-host"><i class="icon-bookmark"></i> Host</label>
-        <input type="text" id="node-config-input-host">
+        <label for="node-config-input-clienttype"><i class="icon-bookmark"></i> Client Type</label>
+        <select type="text" id="node-config-input-clienttype" style="margin-left: 5px; width:200px;">
+            <option value="tcp" select>TCP</option>
+            <option value="serial">Serial</option>
+        </select>
     </div>
-    <div class="form-row">
-        <label for="node-config-input-port"><i class="icon-bookmark"></i> Port</label>
-        <input type="text" id="node-config-input-port">
+    <div id="node-config-modbus-tcp">
+        <div class="form-row">
+            <label for="node-config-input-host"><i class="icon-bookmark"></i> Host</label>
+            <input type="text" id="node-config-input-host">
+        </div>
+        <div class="form-row">
+            <label for="node-config-input-port"><i class="icon-bookmark"></i> Port</label>
+            <input type="text" id="node-config-input-port">
+        </div>
     </div>
+    <div id="node-config-modbus-serial">
+        <div class="form-row">
+            <label for="node-config-input-serialport"><i class="fa fa-random"></i> <span>Serial Port</span></label>
+            <input type="text" id="node-config-input-serialport" style="width:60%;" placeholder="For example: /dev/ttyS0">
+            <a id="node-config-lookup-serial" class="btn"><i id="node-config-lookup-serial-icon" class="fa fa-search"></i></a>
+        </div>
+        <!-- TODO: baudrate, data bits, parity, stop bits...-->
+	</div>
     <div class="form-row">
         <label for="node-config-input-unit_id"><i class="icon-bookmark"></i> Unit Id</label>
         <input type="text" id="node-config-input-unit_id">
